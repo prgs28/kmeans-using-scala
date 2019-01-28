@@ -1,0 +1,69 @@
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+
+object KMeans {
+  type Point = (Double, Double);
+  var centroids: Array[Point] = Array[Point]()
+  var points_data : Array[Point] = Array[Point]()
+  var cent : Array[(Point, Point)] = Array[(Point, Point)]()
+
+ def find_centroid(c : Array[Point], p : Point) : Point = 
+  {
+  
+    var min_dist = Double.PositiveInfinity;
+    var cal_dist = Double.PositiveInfinity;
+    var iterate: Int=0;
+    var count : Int = 0;
+
+    for(i <- c)
+    {
+      cal_dist = Math.sqrt(((i._1-p._1)*(i._1 - p._1)) + ((i._2-p._2)*(i._2-p._2)));
+      if(cal_dist < min_dist)
+      {
+        min_dist = cal_dist; 
+        iterate = count;
+      }
+      count += 1
+    }
+    return (c(iterate)._1, c(iterate)._2)
+  }
+
+  def reducer(c : Point , p : Seq[Point]) : Point = 
+  {
+  
+    var count : Int = 0;
+    var sx : Double = 0.00;
+    var sy : Double = 0.00;
+    for(i <- p)
+    {
+      count= count+1  
+      sx += i._1 
+      sy += i._2
+    }
+    return (sx/count, sy/count);
+  }
+
+
+  def main(args: Array[ String ]) 
+  {
+    val conf = new SparkConf().setAppName("KMeans")
+    conf.setMaster("local[2]")
+    val sc = new SparkContext(conf)
+    centroids = sc.textFile(args(0)).collect.map(line =>{ val a = line.split(",") 
+                                                        (a(0).toDouble,a(1).toDouble)})
+    points_data = sc.textFile(args(1)).collect.map(line =>{ val a = line.split(",") 
+                                                        (a(0).toDouble, a(1).toDouble)}) 
+    var z:Array[Point]= Array[Point]()
+    for ( i <- 1 to 5 ) 
+    {
+      cent = points_data.map(d => {((find_centroid(centroids, d), (d._1, d._2)))})
+      for(i <- 0 until points_data.length)
+      {
+        var cent2: Point =  find_centroid(centroids,points_data(i))
+        centroids :+ reducer(cent2,points_data);
+      }
+    }
+    centroids.foreach(println)
+    sc.stop()
+  }
+}
